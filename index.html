@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Minecraft Bingo Card Randomiser</title>
+  <style>
+    /* Basic reset & body styling */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f8ff;
+      color: #333;
+      text-align: center;
+      margin: 20px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+    h2, h3 {
+      margin-bottom: 5px;
+    }
+
+    /* Top controls (Edit Rarities, Card Size, Generate Button) */
+    #controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    #controls label {
+      margin-right: 5px;
+    }
+
+    /* Card & Probability Display */
+    #cardSizeDisplay,
+    #probabilityDisplay {
+      margin-top: 10px;
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    /* Bingo card table */
+    #bingoCard table {
+      margin: 20px auto;
+      border-collapse: collapse;
+    }
+    #bingoCard td {
+      border: 2px solid #333;
+      width: 80px;
+      height: 80px;
+      vertical-align: middle;
+      font-size: 12px;
+      text-align: center;
+      transition: background-color 0.4s;
+    }
+
+    /* Slot Machine Animation for Random Size */
+    #slotMachine {
+      display: none;
+      margin: 20px auto;
+      width: 320px;
+      border: 2px solid #333;
+      background: #eee;
+      padding: 10px;
+      text-align: center;
+    }
+    .reel {
+      display: inline-block;
+      width: 80px;
+      height: 80px;
+      margin: 0 5px;
+      border: 2px solid #666;
+      font-size: 28px;
+      line-height: 80px;
+      background: #fff;
+    }
+
+    /* Rarity Editor Panel */
+    #rarityEditor {
+      display: none;
+      max-width: 900px;
+      margin: 20px auto;
+      text-align: left;
+      border: 1px solid #333;
+      background: #fff;
+      padding: 10px;
+    }
+    #rarityEditor h2 {
+      margin-top: 0;
+      margin-bottom: 5px;
+    }
+    #rarityEditor p {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 10px;
+    }
+    #rarityList {
+      max-height: 300px; /* scroll if it becomes too large */
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 5px;
+    }
+    .itemRow {
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .itemRow label {
+      width: 60%;
+      text-align: left;
+    }
+    .rarityInput {
+      width: 80px;
+      margin-left: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Minecraft Bingo Card Randomiser</h1>
+
+  <!-- Top controls -->
+  <div id="controls">
+    <button id="editRaritiesButton">Edit Item Rarities</button>
+
+    <div>
+      <label>Randomize card size?</label>
+      <input type="radio" name="sizeOption" id="sizeRandomYes" value="yes" checked> Yes
+      <input type="radio" name="sizeOption" id="sizeRandomNo" value="no"> No
+    </div>
+
+    <select id="manualSizeSelect" style="display: none;">
+      <option value="1">1×1</option>
+      <option value="2">2×2</option>
+      <option value="3">3×3</option>
+      <option value="4">4×4</option>
+      <option value="5" selected>5×5</option>
+      <option value="6">6×6</option>
+      <option value="7">7×7</option>
+      <option value="8">8×8</option>
+      <option value="9">9×9</option>
+      <option value="10">10×10</option>
+    </select>
+
+    <button id="generateCardButton">Generate New Card</button>
+  </div>
+
+  <!-- Slot Machine for random card size -->
+  <div id="slotMachine">
+    <div class="reel" id="reel1">?</div>
+    <div class="reel" id="reel2">?</div>
+    <div class="reel" id="reel3">?</div>
+  </div>
+
+  <div id="cardSizeDisplay"></div>
+  <div id="bingoCard"></div>
+  <div id="probabilityDisplay"></div>
+
+  <!-- Rarity Editor Panel -->
+  <div id="rarityEditor">
+    <h2>Edit Item Rarities</h2>
+    <p>
+      Each item's rarity is its selection weight (lower = rarer). For example, 0.01 means extremely rare; 1 means common; 0.5 means uncommon; 0.000001 means super rare.<br>
+      Adjust values below to fine-tune the card generation. Changes take effect after you click "Save Changes."
+    </p>
+    <div id="rarityList"></div>
+    <button id="saveRaritiesButton">Save Changes</button>
+  </div>
+
+  <!-- Audio for slot machine and item reveal -->
+  <audio id="spinSound" src="https://cdn.pixabay.com/download/audio/2022/08/20/audio_f5a8404616.mp3?filename=casino-slot-machine-112138.mp3"></audio>
+  <audio id="revealSound" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_12a42400c4.mp3?filename=retro-game-notification-38284.mp3"></audio>
+
+  <script>
+    /*******************************************************
+     * 1) FULL ITEM LIST (900+), REMOVING UNWANTED ITEMS
+     *******************************************************/
+    const fullItemsString = `STONE
+GRANITE
+POLISHED_GRANITE
+DIORITE
+POLISHED_DIORITE
+ANDESITE
+POLISHED_ANDESITE
+DEEPSLATE
+COBBLED_DEEPSLATE
+POLISHED_DEEPSLATE
+CALCITE
+DRIPSTONE_BLOCK
+GRASS_BLOCK
+DIRT
+COARSE_DIRT
+PODZOL
+ROOTED_DIRT
+MUD
+COBBLESTONE
+OAK_PLANKS
+SPRUCE_PLANKS
+BIRCH_PLANKS
+JUNGLE_PLANKS
+ACACIA_PLANKS
+CHERRY_PLANKS
+DARK_OAK_PLANKS
+BAMBOO_PLANKS
+BAMBOO_MOSAIC
+OAK_SAPLING
+SPRUCE_SAPLING
+BIRCH_SAPLING
+JUNGLE_SAPLING
+ACACIA_SAPLING
+CHERRY_SAPLING
+DARK_OAK_SAPLING
+MANGROVE_PROPAGULE
+SAND
+SUSPICIOUS_SAND
+SUSPICIOUS_GRAVEL
+RED_SAND
+GRAVEL
+COAL_ORE
+IRON_ORE
+COPPER_ORE
+GOLD_ORE
+REDSTONE_ORE
+EMERALD_ORE
+LAPIS_ORE
+DIAMOND_ORE
+ANCIENT_DEBRIS
+COAL_BLOCK
+RAW_IRON_BLOCK
+RAW_COPPER_BLOCK
+RAW_GOLD_BLOCK
+AMETHYST_BLOCK
+IRON_BLOCK
+COPPER_BLOCK
+GOLD_BLOCK
+DIAMOND_BLOCK
+EXPOSED_COPPER
+WEATHERED_COPPER
+OXIDIZED_COPPER
+CUT_COPPER
+EXPOSED_CUT_COPPER
+WEATHERED_CUT_COPPER
+OXIDIZED_CUT_COPPER
+CUT_COPPER_STAIRS
+EXPOSED_CUT_COPPER_STAIRS
+WEATHERED_CUT_COPPER_STAIRS
+OXIDIZED_CUT_COPPER_STAIRS
+CUT_COPPER_SLAB
+EXPOSED_CUT_COPPER_SLAB
+WEATHERED_CUT_COPPER_SLAB
+OXIDIZED_CUT_COPPER_SLAB
+WAXED_COPPER_BLOCK
+WAXED_EXPOSED_COPPER
+WAXED_WEATHERED_COPPER
+WAXED_OXIDIZED_COPPER
+WAXED_CUT_COPPER
+WAXED_EXPOSED_CUT_COPPER
+WAXED_WEATHERED_CUT_COPPER
+WAXED_OXIDIZED_CUT_COPPER
+WAXED_CUT_COPPER_STAIRS
+WAXED_EXPOSED_CUT_COPPER_STAIRS
+WAXED_WEATHERED_CUT_COPPER_STAIRS
+WAXED_OXIDIZED_CUT_COPPER_STAIRS
+WAXED_CUT_COPPER_SLAB
+WAXED_EXPOSED_CUT_COPPER_SLAB
+WAXED_WEATHERED_CUT_COPPER_SLAB
+WAXED_OXIDIZED_CUT_COPPER_SLAB
+OAK_LOG
+SPRUCE_LOG
+BIRCH_LOG
+JUNGLE_LOG
+ACACIA_LOG
+CHERRY_LOG
+DARK_OAK_LOG
+MANGROVE_LOG
+MANGROVE_ROOTS
+MUDDY_MANGROVE_ROOTS
+BAMBOO_BLOCK
+STRIPPED_OAK_LOG
+STRIPPED_SPRUCE_LOG
+STRIPPED_BIRCH_LOG
+STRIPPED_JUNGLE_LOG
+STRIPPED_ACACIA_LOG
+STRIPPED_CHERRY_LOG
+STRIPPED_DARK_OAK_LOG
+STRIPPED_MANGROVE_LOG
+STRIPPED_OAK_WOOD
+STRIPPED_SPRUCE_WOOD
+STRIPPED_BIRCH_WOOD
+STRIPPED_JUNGLE_WOOD
+STRIPPED_ACACIA_WOOD
+STRIPPED_CHERRY_WOOD
+STRIPPED_DARK_OAK_WOOD
+STRIPPED_MANGROVE_WOOD
+STRIPPED_BAMBOO_BLOCK
+OAK_WOOD
+SPRUCE_WOOD
+BIRCH_WOOD
+JUNGLE_WOOD
+ACACIA_WOOD
+CHERRY_WOOD
+DARK_OAK_WOOD
+MANGROVE_WOOD
+OAK_LEAVES
+SPRUCE_LEAVES
+BIRCH_LEAVES
+JUNGLE_LEAVES
+ACACIA_LEAVES
+CHERRY_LEAVES
+DARK_OAK_LEAVES
+MANGROVE_LEAVES
+AZALEA_LEAVES
+FLOWERING_AZALEA_LEAVES
+SPONGE
+WET_SPONGE
+GLASS
+TINTED_GLASS
+LAPIS_BLOCK
+SANDSTONE
+CHISELED_SANDSTONE
+CUT_SANDSTONE
+COBWEB
+SHORT_GRASS
+FERN
+AZALEA
+FLOWERING_AZALEA
+DEAD_BUSH
+SEAGRASS
+SEA_PICKLE
+WHITE_WOOL
+ORANGE_WOOL
+MAGENTA_WOOL
+LIGHT_BLUE_WOOL
+YELLOW_WOOL
+LIME_WOOL
+PINK_WOOL
+GRAY_WOOL
+LIGHT_GRAY_WOOL
+CYAN_WOOL
+PURPLE_WOOL
+BLUE_WOOL
+BROWN_WOOL
+GREEN_WOOL
+RED_WOOL
+BLACK_WOOL
+DANDELION
+POPPY
+BLUE_ORCHID
+ALLIUM
+AZURE_BLUET
+RED_TULIP
+ORANGE_TULIP
+WHITE_TULIP
+PINK_TULIP
+OXEYE_DAISY
+CORNFLOWER
+LILY_OF_THE_VALLEY
+TORCHFLOWER
+PITCHER_PLANT
+SPORE_BLOSSOM
+BROWN_MUSHROOM
+RED_MUSHROOM
+SUGAR_CANE
+KELP
+MOSS_CARPET
+PINK_PETALS
+MOSS_BLOCK
+BIG_DRIPLEAF
+SMALL_DRIPLEAF
+BAMBOO
+OAK_SLAB
+SPRUCE_SLAB
+BIRCH_SLAB
+JUNGLE_SLAB
+ACACIA_SLAB
+CHERRY_SLAB
+DARK_OAK_SLAB
+MANGROVE_SLAB
+BAMBOO_SLAB
+BAMBOO_MOSAIC_SLAB
+STONE_SLAB
+SMOOTH_STONE_SLAB
+SANDSTONE_SLAB
+CUT_SANDSTONE_SLAB
+PETRIFIED_OAK_SLAB
+COBBLESTONE_SLAB
+BRICK_SLAB
+STONE_BRICK_SLAB
+MUD_BRICK_SLAB
+RED_SANDSTONE_SLAB
+CUT_RED_SANDSTONE_SLAB
+PRISMARINE_SLAB
+PRISMARINE_BRICK_SLAB
+DARK_PRISMARINE_SLAB
+SMOOTH_RED_SANDSTONE
+SMOOTH_SANDSTONE
+SMOOTH_STONE
+BRICKS
+BOOKSHELF
+CHISELED_BOOKSHELF
+DECORATED_POT
+MOSSY_COBBLESTONE
+OBSIDIAN
+TORCH
+CHEST
+CRAFTING_TABLE
+FURNACE
+LADDER
+COBBLESTONE_STAIRS
+SNOW
+ICE
+SNOW_BLOCK
+CACTUS
+CLAY
+JUKEBOX
+OAK_FENCE
+SPRUCE_FENCE
+BIRCH_FENCE
+JUNGLE_FENCE
+ACACIA_FENCE
+CHERRY_FENCE
+DARK_OAK_FENCE
+MANGROVE_FENCE
+BAMBOO_FENCE
+PUMPKIN
+CARVED_PUMPKIN
+JACK_O_LANTERN
+STONE_BRICKS
+MOSSY_STONE_BRICKS
+CRACKED_STONE_BRICKS
+CHISELED_STONE_BRICKS
+PACKED_MUD
+MUD_BRICKS
+DEEPSLATE_BRICKS
+CRACKED_DEEPSLATE_BRICKS
+DEEPSLATE_TILES
+CRACKED_DEEPSLATE_TILES
+CHISELED_DEEPSLATE
+REINFORCED_DEEPSLATE
+IRON_BARS
+CHAIN
+GLASS_PANE
+MELON
+VINE
+GLOW_LICHEN
+BRICK_STAIRS
+STONE_BRICK_STAIRS
+MUD_BRICK_STAIRS
+LILY_PAD
+ENCHANTING_TABLE
+SANDSTONE_STAIRS
+EMERALD_BLOCK
+OAK_STAIRS
+SPRUCE_STAIRS
+BIRCH_STAIRS
+JUNGLE_STAIRS
+ACACIA_STAIRS
+CHERRY_STAIRS
+DARK_OAK_STAIRS
+MANGROVE_STAIRS
+BAMBOO_STAIRS
+BAMBOO_MOSAIC_STAIRS
+COBBLESTONE_WALL
+MOSSY_COBBLESTONE_WALL
+BRICK_WALL
+PRISMARINE_WALL
+RED_SANDSTONE_WALL
+MOSSY_STONE_BRICK_WALL
+GRANITE_WALL
+STONE_BRICK_WALL
+MUD_BRICK_WALL
+ANDESITE_WALL
+SANDSTONE_WALL
+DIORITE_WALL
+COBBLED_DEEPSLATE_WALL
+POLISHED_DEEPSLATE_WALL
+DEEPSLATE_BRICK_WALL
+DEEPSLATE_TILE_WALL
+ANVIL
+HAY_BLOCK
+WHITE_CARPET
+ORANGE_CARPET
+MAGENTA_CARPET
+LIGHT_BLUE_CARPET
+YELLOW_CARPET
+LIME_CARPET
+PINK_CARPET
+GRAY_CARPET
+LIGHT_GRAY_CARPET
+CYAN_CARPET
+PURPLE_CARPET
+BLUE_CARPET
+BROWN_CARPET
+GREEN_CARPET
+RED_CARPET
+BLACK_CARPET
+PACKED_ICE
+SUNFLOWER
+LILAC
+ROSE_BUSH
+PEONY
+TALL_GRASS
+LARGE_FERN
+WHITE_STAINED_GLASS
+ORANGE_STAINED_GLASS
+MAGENTA_STAINED_GLASS
+LIGHT_BLUE_STAINED_GLASS
+YELLOW_STAINED_GLASS
+LIME_STAINED_GLASS
+PINK_STAINED_GLASS
+GRAY_STAINED_GLASS
+LIGHT_GRAY_STAINED_GLASS
+CYAN_STAINED_GLASS
+PURPLE_STAINED_GLASS
+BLUE_STAINED_GLASS
+BROWN_STAINED_GLASS
+GREEN_STAINED_GLASS
+RED_STAINED_GLASS
+BLACK_STAINED_GLASS
+WHITE_STAINED_GLASS_PANE
+ORANGE_STAINED_GLASS_PANE
+MAGENTA_STAINED_GLASS_PANE
+LIGHT_BLUE_STAINED_GLASS_PANE
+YELLOW_STAINED_GLASS_PANE
+LIME_STAINED_GLASS_PANE
+PINK_STAINED_GLASS_PANE
+GRAY_STAINED_GLASS_PANE
+LIGHT_GRAY_STAINED_GLASS_PANE
+CYAN_STAINED_GLASS_PANE
+PURPLE_STAINED_GLASS_PANE
+BLUE_STAINED_GLASS_PANE
+BROWN_STAINED_GLASS_PANE
+GREEN_STAINED_GLASS_PANE
+RED_STAINED_GLASS_PANE
+BLACK_STAINED_GLASS_PANE
+PRISMARINE
+PRISMARINE_BRICKS
+DARK_PRISMARINE
+PRISMARINE_STAIRS
+PRISMARINE_BRICK_STAIRS
+DARK_PRISMARINE_STAIRS
+SEA_LANTERN
+RED_SANDSTONE
+CHISELED_RED_SANDSTONE
+CUT_RED_SANDSTONE
+RED_SANDSTONE_STAIRS
+MAGMA_BLOCK
+WHITE_CONCRETE
+ORANGE_CONCRETE
+MAGENTA_CONCRETE
+LIGHT_BLUE_CONCRETE
+YELLOW_CONCRETE
+LIME_CONCRETE
+PINK_CONCRETE
+GRAY_CONCRETE
+LIGHT_GRAY_CONCRETE
+CYAN_CONCRETE
+PURPLE_CONCRETE
+BLUE_CONCRETE
+BROWN_CONCRETE
+GREEN_CONCRETE
+RED_CONCRETE
+BLACK_CONCRETE
+WHITE_CONCRETE_POWDER
+ORANGE_CONCRETE_POWDER
+MAGENTA_CONCRETE_POWDER
+LIGHT_BLUE_CONCRETE_POWDER
+YELLOW_CONCRETE_POWDER
+LIME_CONCRETE_POWDER
+PINK_CONCRETE_POWDER
+GRAY_CONCRETE_POWDER
+LIGHT_GRAY_CONCRETE_POWDER
+CYAN_CONCRETE_POWDER
+PURPLE_CONCRETE_POWDER
+BLUE_CONCRETE_POWDER
+BROWN_CONCRETE_POWDER
+GREEN_CONCRETE_POWDER
+RED_CONCRETE_POWDER
+BLACK_CONCRETE_POWDER
+CONDUIT
+POLISHED_GRANITE_STAIRS
+SMOOTH_RED_SANDSTONE_STAIRS
+MOSSY_STONE_BRICK_STAIRS
+POLISHED_DIORITE_STAIRS
+MOSSY_COBBLESTONE_STAIRS
+STONE_STAIRS
+SMOOTH_SANDSTONE_STAIRS
+GRANITE_STAIRS
+ANDESITE_STAIRS
+POLISHED_ANDESITE_STAIRS
+DIORITE_STAIRS
+COBBLED_DEEPSLATE_STAIRS
+POLISHED_DEEPSLATE_STAIRS
+DEEPSLATE_BRICK_STAIRS
+DEEPSLATE_TILE_STAIRS
+POLISHED_GRANITE_SLAB
+SMOOTH_RED_SANDSTONE_SLAB
+MOSSY_STONE_BRICK_SLAB
+POLISHED_DIORITE_SLAB
+MOSSY_COBBLESTONE_SLAB
+SMOOTH_SANDSTONE_SLAB
+GRANITE_SLAB
+ANDESITE_SLAB
+POLISHED_ANDESITE_SLAB
+DIORITE_SLAB
+COBBLED_DEEPSLATE_SLAB
+POLISHED_DEEPSLATE_SLAB
+DEEPSLATE_BRICK_SLAB
+DEEPSLATE_TILE_SLAB
+SCAFFOLDING
+REDSTONE
+REDSTONE_TORCH
+REDSTONE_BLOCK
+REPEATER
+COMPARATOR
+PISTON
+STICKY_PISTON
+SLIME_BLOCK
+HONEY_BLOCK
+OBSERVER
+HOPPER
+DISPENSER
+DROPPER
+LECTERN
+TARGET
+LEVER
+DAYLIGHT_DETECTOR
+TRIPWIRE_HOOK
+TRAPPED_CHEST
+TNT
+NOTE_BLOCK
+STONE_BUTTON
+OAK_BUTTON
+SPRUCE_BUTTON
+BIRCH_BUTTON
+JUNGLE_BUTTON
+ACACIA_BUTTON
+CHERRY_BUTTON
+DARK_OAK_BUTTON
+MANGROVE_BUTTON
+BAMBOO_BUTTON
+STONE_PRESSURE_PLATE
+LIGHT_WEIGHTED_PRESSURE_PLATE
+HEAVY_WEIGHTED_PRESSURE_PLATE
+OAK_PRESSURE_PLATE
+SPRUCE_PRESSURE_PLATE
+BIRCH_PRESSURE_PLATE
+JUNGLE_PRESSURE_PLATE
+ACACIA_PRESSURE_PLATE
+CHERRY_PRESSURE_PLATE
+DARK_OAK_PRESSURE_PLATE
+MANGROVE_PRESSURE_PLATE
+BAMBOO_PRESSURE_PLATE
+IRON_DOOR
+OAK_DOOR
+SPRUCE_DOOR
+BIRCH_DOOR
+JUNGLE_DOOR
+ACACIA_DOOR
+CHERRY_DOOR
+DARK_OAK_DOOR
+MANGROVE_DOOR
+BAMBOO_DOOR
+COPPER_DOOR
+EXPOSED_COPPER_DOOR
+WEATHERED_COPPER_DOOR
+OXIDIZED_COPPER_DOOR
+WAXED_COPPER_DOOR
+WAXED_EXPOSED_COPPER_DOOR
+WAXED_WEATHERED_COPPER_DOOR
+WAXED_OXIDIZED_COPPER_DOOR
+IRON_TRAPDOOR
+OAK_TRAPDOOR
+SPRUCE_TRAPDOOR
+BIRCH_TRAPDOOR
+JUNGLE_TRAPDOOR
+ACACIA_TRAPDOOR
+CHERRY_TRAPDOOR
+DARK_OAK_TRAPDOOR
+MANGROVE_TRAPDOOR
+BAMBOO_TRAPDOOR
+COPPER_TRAPDOOR
+EXPOSED_COPPER_TRAPDOOR
+WEATHERED_COPPER_TRAPDOOR
+OXIDIZED_COPPER_TRAPDOOR
+WAXED_COPPER_TRAPDOOR
+WAXED_EXPOSED_COPPER_TRAPDOOR
+WAXED_WEATHERED_COPPER_TRAPDOOR
+WAXED_OXIDIZED_COPPER_TRAPDOOR
+OAK_FENCE_GATE
+SPRUCE_FENCE_GATE
+BIRCH_FENCE_GATE
+JUNGLE_FENCE_GATE
+ACACIA_FENCE_GATE
+CHERRY_FENCE_GATE
+DARK_OAK_FENCE_GATE
+MANGROVE_FENCE_GATE
+BAMBOO_FENCE_GATE
+POWERED_RAIL
+DETECTOR_RAIL
+RAIL
+ACTIVATOR_RAIL
+SADDLE
+MINECART
+CHEST_MINECART
+FURNACE_MINECART
+TNT_MINECART
+HOPPER_MINECART
+CARROT_ON_A_STICK
+OAK_BOAT
+OAK_CHEST_BOAT
+SPRUCE_BOAT
+SPRUCE_CHEST_BOAT
+BIRCH_BOAT
+BIRCH_CHEST_BOAT
+JUNGLE_BOAT
+JUNGLE_CHEST_BOAT
+ACACIA_BOAT
+ACACIA_CHEST_BOAT
+CHERRY_BOAT
+CHERRY_CHEST_BOAT
+DARK_OAK_BOAT
+DARK_OAK_CHEST_BOAT
+MANGROVE_BOAT
+MANGROVE_CHEST_BOAT
+BAMBOO_RAFT
+BAMBOO_CHEST_RAFT
+TURTLE_HELMET
+FLINT_AND_STEEL
+APPLE
+BOW
+ARROW
+COAL
+CHARCOAL
+DIAMOND
+EMERALD
+LAPIS_LAZULI
+AMETHYST_SHARD
+RAW_IRON
+IRON_INGOT
+RAW_COPPER
+COPPER_INGOT
+RAW_GOLD
+GOLD_INGOT
+WOODEN_SWORD
+WOODEN_SHOVEL
+WOODEN_PICKAXE
+WOODEN_AXE
+WOODEN_HOE
+STONE_SWORD
+STONE_SHOVEL
+STONE_PICKAXE
+STONE_AXE
+STONE_HOE
+GOLDEN_SWORD
+GOLDEN_SHOVEL
+GOLDEN_PICKAXE
+GOLDEN_AXE
+GOLDEN_HOE
+IRON_SWORD
+IRON_SHOVEL
+IRON_PICKAXE
+IRON_AXE
+IRON_HOE
+DIAMOND_SWORD
+DIAMOND_SHOVEL
+DIAMOND_PICKAXE
+DIAMOND_AXE
+DIAMOND_HOE
+STICK
+BOWL
+STRING
+FEATHER
+GUNPOWDER
+WHEAT_SEEDS
+WHEAT
+BREAD
+LEATHER_HELMET
+LEATHER_CHESTPLATE
+LEATHER_LEGGINGS
+LEATHER_BOOTS
+CHAINMAIL_HELMET
+CHAINMAIL_CHESTPLATE
+CHAINMAIL_LEGGINGS
+CHAINMAIL_BOOTS
+IRON_HELMET
+IRON_CHESTPLATE
+IRON_LEGGINGS
+IRON_BOOTS
+DIAMOND_HELMET
+DIAMOND_CHESTPLATE
+DIAMOND_LEGGINGS
+DIAMOND_BOOTS
+GOLDEN_HELMET
+GOLDEN_CHESTPLATE
+GOLDEN_LEGGINGS
+GOLDEN_BOOTS
+FLINT
+PORKCHOP
+COOKED_PORKCHOP
+PAINTING
+GOLDEN_APPLE
+ENCHANTED_GOLDEN_APPLE
+OAK_SIGN
+SPRUCE_SIGN
+BIRCH_SIGN
+JUNGLE_SIGN
+ACACIA_SIGN
+CHERRY_SIGN
+DARK_OAK_SIGN
+MANGROVE_SIGN
+BAMBOO_SIGN
+OAK_HANGING_SIGN
+SPRUCE_HANGING_SIGN
+BIRCH_HANGING_SIGN
+JUNGLE_HANGING_SIGN
+ACACIA_HANGING_SIGN
+CHERRY_HANGING_SIGN
+DARK_OAK_HANGING_SIGN
+MANGROVE_HANGING_SIGN
+BAMBOO_HANGING_SIGN
+BUCKET
+WATER_BUCKET
+LAVA_BUCKET
+POWDER_SNOW_BUCKET
+SNOWBALL
+LEATHER
+MILK_BUCKET
+PUFFERFISH_BUCKET
+SALMON_BUCKET
+COD_BUCKET
+TROPICAL_FISH_BUCKET
+AXOLOTL_BUCKET
+TADPOLE_BUCKET
+BRICK
+CLAY_BALL
+DRIED_KELP_BLOCK
+PAPER
+BOOK
+SLIME_BALL
+EGG
+COMPASS
+FISHING_ROD
+CLOCK
+SPYGLASS
+GLOWSTONE_DUST
+COD
+SALMON
+TROPICAL_FISH
+PUFFERFISH
+COOKED_COD
+COOKED_SALMON
+INK_SAC
+GLOW_INK_SAC
+COCOA_BEANS
+WHITE_DYE
+ORANGE_DYE
+MAGENTA_DYE
+LIGHT_BLUE_DYE
+YELLOW_DYE
+LIME_DYE
+PINK_DYE
+GRAY_DYE
+LIGHT_GRAY_DYE
+CYAN_DYE
+PURPLE_DYE
+BLUE_DYE
+BROWN_DYE
+GREEN_DYE
+RED_DYE
+BLACK_DYE
+BONE_MEAL
+BONE
+SUGAR
+CAKE
+WHITE_BED
+ORANGE_BED
+MAGENTA_BED
+LIGHT_BLUE_BED
+YELLOW_BED
+LIME_BED
+PINK_BED
+GRAY_BED
+LIGHT_GRAY_BED
+CYAN_BED
+PURPLE_BED
+BLUE_BED
+BROWN_BED
+GREEN_BED
+RED_BED
+BLACK_BED
+COOKIE
+SHEARS
+MELON_SLICE
+DRIED_KELP
+PUMPKIN_SEEDS
+MELON_SEEDS
+BEEF
+COOKED_BEEF
+CHICKEN
+COOKED_CHICKEN
+ROTTEN_FLESH
+ENDER_PEARL
+GOLD_NUGGET
+GLASS_BOTTLE
+SPIDER_EYE
+FERMENTED_SPIDER_EYE
+BREWING_STAND
+CAULDRON
+GLISTERING_MELON_SLICE
+EXPERIENCE_BOTTLE
+FIRE_CHARGE
+WRITABLE_BOOK
+ITEM_FRAME
+GLOW_ITEM_FRAME
+FLOWER_POT
+CARROT
+POTATO
+BAKED_POTATO
+POISONOUS_POTATO
+GOLDEN_CARROT
+PUMPKIN_PIE
+FIREWORK_ROCKET
+PRISMARINE_SHARD
+PRISMARINE_CRYSTALS
+RABBIT
+COOKED_RABBIT
+RABBIT_STEW
+RABBIT_FOOT
+RABBIT_HIDE
+ARMOR_STAND
+NAME_TAG
+MUTTON
+COOKED_MUTTON
+BEETROOT
+BEETROOT_SEEDS
+BEETROOT_SOUP
+SPLASH_POTION
+SHIELD
+IRON_NUGGET
+TRIDENT
+NAUTILUS_SHELL
+HEART_OF_THE_SEA
+CROSSBOW
+SUSPICIOUS_STEW
+LOOM
+COMPOSTER
+BARREL
+SMOKER
+BLAST_FURNACE
+CARTOGRAPHY_TABLE
+FLETCHING_TABLE
+GRINDSTONE
+SMITHING_TABLE
+STONECUTTER
+BELL
+LANTERN
+SWEET_BERRIES
+GLOW_BERRIES
+CAMPFIRE
+HONEYCOMB
+BEEHIVE
+HONEY_BOTTLE
+HONEYCOMB_BLOCK
+CRYING_OBSIDIAN
+CANDLE
+WHITE_CANDLE
+ORANGE_CANDLE
+MAGENTA_CANDLE
+LIGHT_BLUE_CANDLE
+YELLOW_CANDLE
+LIME_CANDLE
+PINK_CANDLE
+GRAY_CANDLE
+LIGHT_GRAY_CANDLE
+CYAN_CANDLE
+PURPLE_CANDLE
+BLUE_CANDLE
+BROWN_CANDLE
+GREEN_CANDLE
+RED_CANDLE
+BLACK_CANDLE
+POINTED_DRIPSTONE
+BRUSH
+COPPER_GRATE
+EXPOSED_COPPER_GRATE
+WEATHERED_COPPER_GRATE
+OXIDIZED_COPPER_GRATE
+WAXED_COPPER_GRATE
+WAXED_EXPOSED_COPPER_GRATE
+WAXED_WEATHERED_COPPER_GRATE
+WAXED_OXIDIZED_COPPER_GRATE
+WHITE_TERRACOTTA
+ORANGE_TERRACOTTA
+MAGENTA_TERRACOTTA
+LIGHT_BLUE_TERRACOTTA
+YELLOW_TERRACOTTA
+LIME_TERRACOTTA
+PINK_TERRACOTTA
+GRAY_TERRACOTTA
+LIGHT_GRAY_TERRACOTTA
+CYAN_TERRACOTTA
+PURPLE_TERRACOTTA
+BLUE_TERRACOTTA
+BROWN_TERRACOTTA
+GREEN_TERRACOTTA
+RED_TERRACOTTA
+BLACK_TERRACOTTA
+NETHERITE_BLOCK
+CRIMSON_PLANKS
+WARPED_PLANKS
+CRIMSON_STEM
+WARPED_STEM
+STRIPPED_CRIMSON_STEM
+STRIPPED_WARPED_STEM
+NETHER_GOLD_ORE
+NETHER_QUARTZ_ORE
+CRIMSON_FUNGUS
+WARPED_FUNGUS
+CRIMSON_ROOTS
+WARPED_ROOTS
+NETHER_SPROUTS
+CRIMSON_SLAB
+WARPED_SLAB
+SMOOTH_QUARTZ
+NETHERRACK
+SOUL_SAND
+GLOWSTONE
+NETHER_BRICKS
+CRACKED_NETHER_BRICKS
+CHISELED_NETHER_BRICKS
+NETHER_BRICK_FENCE
+NETHER_BRICK_STAIRS
+CRIMSON_STAIRS
+WARPED_STAIRS
+NETHER_BRICK_WALL
+CHISELED_QUARTZ_BLOCK
+QUARTZ_BLOCK
+QUARTZ_BRICKS
+QUARTZ_PILLAR
+QUARTZ_STAIRS
+NETHER_WART_BLOCK
+WARPED_WART_BLOCK
+RED_NETHER_BRICKS
+BONE_BLOCK
+SMOOTH_QUARTZ_STAIRS
+CRIMSON_DOOR
+WARPED_DOOR
+CRIMSON_TRAPDOOR
+WARPED_TRAPDOOR
+NETHERITE_INGOT
+NETHERITE_SCRAP
+QUARTZ
+NETHERITE_SWORD
+NETHERITE_SHOVEL
+NETHERITE_PICKAXE
+NETHERITE_AXE
+NETHERITE_HOE
+NETHERITE_HELMET
+NETHERITE_CHESTPLATE
+NETHERITE_LEGGINGS
+NETHERITE_BOOTS
+BLAZE_ROD
+GHAST_TEAR
+NETHER_WART
+BLAZE_POWDER
+MAGMA_CREAM
+BASALT
+SMOOTH_BASALT
+POLISHED_BASALT
+BLACKSTONE
+POLISHED_BLACKSTONE
+END_STONE
+END_STONE_BRICKS
+CHORUS_FRUIT
+PURPUR_BLOCK
+PURPUR_PILLAR
+DRAGON_HEAD
+DRAGON_EGG
+ELYTRA
+REDSTONE_LAMP
+LIGHTNING_ROD`;
+
+    // Create array, removing suspicious_sand, suspicious_gravel, petrified_oak_slab
+    let fullItemsArray = fullItemsString
+      .split('\\n')
+      .map(s => s.trim())
+      .filter(s => s && s !== 'SUSPICIOUS_SAND' && s !== 'SUSPICIOUS_GRAVEL' && s !== 'PETRIFIED_OAK_SLAB');
+
+    /*******************************************************
+     * 2) RARITY ASSIGNMENT
+     *******************************************************/
+    function getItemRarity(item) {
+      const name = item.toUpperCase();
+
+      // Examples of explicit rules:
+      if (name === "GRASS_BLOCK") return 0.01;  // Silk touch
+      if (name === "MANGROVE_PROPAGULE") return 0.0001;
+      if (name.endsWith("_ORE")) return 0.01;  // extremely rare
+      if (name.endsWith("_BLOCK") && /COAL|IRON|COPPER|GOLD|DIAMOND|EMERALD|LAPIS|AMETHYST/.test(name)) return 0.5;
+      if (name.includes("INGOT") && /IRON|COPPER|GOLD/.test(name)) return 0.5;
+      if ((name.includes("IRON") || name.includes("GOLD") || name.includes("COPPER")) &&
+          /SWORD|PICKAXE|AXE|SHOVEL|HOE|HELMET|CHESTPLATE|LEGGINGS|BOOTS/.test(name))
+        return 0.5;
+      if (["CUT_COPPER","CUT_COPPER_STAIRS","CUT_COPPER_SLAB","COPPER_GRATE"].includes(name)) return 0.4;
+      if (name.includes("COPPER") && (name.includes("WAXED") || name.includes("EXPOSED") || name.includes("WEATHERED") || name.includes("OXIDIZED")))
+        return 0.000001;
+      if (/_LOG$/.test(name) || /_WOOD$/.test(name) || /_PLANKS$/.test(name) || /_SAPLING$/.test(name) || /_LEAVES$/.test(name))
+        return 1;
+      if (["STONE","COBBLESTONE","DIRT","COARSE_DIRT","PODZOL","ROOTED_DIRT","MUD"].includes(name))
+        return 1;
+      if (name.endsWith("_SLAB") || name.endsWith("_STAIRS") || name.endsWith("_WALL")) {
+        if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.2;
+        return 1;
+      }
+      if (name === "SPONGE" || name === "WET_SPONGE") return 0.01;
+      if (name.includes("PITCHER_PLANT") || name.includes("TORCHFLOWER") ||
+          name.includes("PITCHER_SEED") || name.includes("TORCHFLOWER_SEED"))
+        return 0.01;
+      if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.2;
+      if (name === "CONDUIT") return 0.001;
+      if (["END_STONE","END_STONE_BRICKS","PURPUR_BLOCK","PURPUR_PILLAR"].includes(name)) return 0.0001;
+      if (name.includes("NETHERITE")) return 0.001;
+      if (name.includes("BLAZE") || name === "ENDER_PEARL") return 0.001;
+      if (name.includes("ANCIENT_DEBRIS")) return 0.005;
+      if (name.includes("BASALT") || name.includes("BLACKSTONE") || name.includes("NETHERRACK") || name.includes("GLOWSTONE"))
+        return 0.02;
+      if (name.includes("SADDLE") || name.includes("NAME_TAG") ||
+          name.includes("ENCHANTING_TABLE") || name.includes("ANVIL"))
+        return 0.01;
+      if (name.includes("GOLDEN_APPLE") || name.includes("POTION") || name.includes("BREWING_STAND"))
+        return 0.01;
+
+      // Default common
+      console.warn("No specific rarity set for:", name, "- assuming common (1)");
+      return 1;
+    }
+
+    let rarityMapping = {};
+    fullItemsArray.forEach(item => {
+      rarityMapping[item] = getItemRarity(item);
+    });
+
+    /*******************************************************
+     * 3) CARD GENERATION
+     *******************************************************/
+    async function getCardSize() {
+      if (document.getElementById("sizeRandomYes").checked) {
+        let randomSize = Math.floor(Math.random() * 3) + 3; // random 3..5
+        let finalSize = await animateSlotMachine(randomSize);
+        return finalSize;
+      } else {
+        return parseInt(document.getElementById("manualSizeSelect").value);
+      }
+    }
+
+    function generateCardArray(size) {
+      let pool = fullItemsArray.slice();
+      let card = [];
+      let overallProbability = 1;
+
+      for (let i = 0; i < size; i++) {
+        card[i] = [];
+        for (let j = 0; j < size; j++) {
+          let totalWeight = pool.reduce((sum, it) => sum + rarityMapping[it], 0);
+          let r = Math.random() * totalWeight;
+          let chosenIndex = 0;
+          for (let k = 0; k < pool.length; k++) {
+            r -= rarityMapping[pool[k]];
+            if (r < 0) { chosenIndex = k; break; }
+          }
+          let chosenItem = pool[chosenIndex];
+          let pickProb = rarityMapping[chosenItem] / totalWeight;
+          overallProbability *= pickProb;
+          card[i][j] = { item: chosenItem, odds: pickProb };
+          pool.splice(chosenIndex, 1);
+        }
+      }
+      card[0][0]._overallProbability = overallProbability;
+      return card;
+    }
+
+    function buildCardTable(card) {
+      let size = card.length;
+      let table = document.createElement("table");
+      for (let i = 0; i < size; i++) {
+        let tr = document.createElement("tr");
+        for (let j = 0; j < size; j++) {
+          let td = document.createElement("td");
+          td.innerText = "";
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      document.getElementById("bingoCard").innerHTML = "";
+      document.getElementById("bingoCard").appendChild(table);
+      return table;
+    }
+
+    async function revealCardSequentially(card, table) {
+      let size = card.length;
+      let cells = table.getElementsByTagName("td");
+      let cellDelay = 500; // ms
+      for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+          let cell = cells[i*size+j];
+          await revealCell(cell, card[i][j].item, card[i][j].odds, cellDelay);
+        }
+      }
+    }
+
+    function revealCell(cellElem, finalItem, finalOdds, revealTime) {
+      return new Promise(resolve => {
+        let startTime = Date.now();
+        let interval = setInterval(() => {
+          if (Date.now() - startTime >= revealTime) {
+            clearInterval(interval);
+            cellElem.innerHTML = finalItem + "<br><span style='font-size:10px;'>(" + (finalOdds*100).toFixed(4) + "%)</span>";
+            cellElem.style.backgroundColor = "#" + Math.floor(Math.random()*16777215).toString(16);
+            let revealSound = document.getElementById("revealSound");
+            if (revealSound) {
+              revealSound.currentTime = 0;
+              revealSound.play();
+            }
+            resolve();
+          } else {
+            cellElem.innerText = fullItemsArray[Math.floor(Math.random() * fullItemsArray.length)];
+          }
+        }, 50);
+      });
+    }
+
+    function animateSlotMachine(finalSize) {
+      return new Promise(resolve => {
+        let slotMachine = document.getElementById("slotMachine");
+        slotMachine.style.display = "block";
+        let reel1 = document.getElementById("reel1");
+        let reel2 = document.getElementById("reel2");
+        let reel3 = document.getElementById("reel3");
+        let sizes = [1,2,3,4,5,6,7,8,9,10];
+        let interval = setInterval(() => {
+          reel1.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
+          reel2.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
+          reel3.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
+        }, 100);
+
+        setTimeout(() => {
+          clearInterval(interval);
+          let display = finalSize + "×" + finalSize;
+          reel1.innerText = display;
+          reel2.innerText = display;
+          reel3.innerText = display;
+          let spinSound = document.getElementById("spinSound");
+          if (spinSound) {
+            spinSound.currentTime = 0;
+            spinSound.play();
+          }
+          setTimeout(() => {
+            slotMachine.style.display = "none";
+            resolve(finalSize);
+          }, 500);
+        }, 2000);
+      });
+    }
+
+    async function main() {
+      document.getElementById("generateCardButton").disabled = true;
+      document.getElementById("probabilityDisplay").innerText = "";
+      document.getElementById("cardSizeDisplay").innerText = "";
+      document.getElementById("bingoCard").innerHTML = "";
+
+      let size = await getCardSize();
+      document.getElementById("cardSizeDisplay").innerText = `Card Size: ${size}×${size}`;
+
+      let card = generateCardArray(size);
+      let table = buildCardTable(card);
+      await revealCardSequentially(card, table);
+
+      let overallProb = card[0][0]._overallProbability;
+      document.getElementById("probabilityDisplay").innerText =
+        `The chance of rolling this exact card is ${(overallProb*100).toExponential(10)}%`;
+
+      document.getElementById("generateCardButton").disabled = false;
+    }
+
+    /*******************************************************
+     * 4) RARITY EDITOR
+     *******************************************************/
+    function toggleRarityEditor() {
+      let panel = document.getElementById("rarityEditor");
+      panel.style.display = (panel.style.display === "none" || panel.style.display === "") ? "block" : "none";
+    }
+
+    function buildRarityEditor() {
+      let list = document.getElementById("rarityList");
+      list.innerHTML = "";
+      fullItemsArray.forEach(item => {
+        let row = document.createElement("div");
+        row.className = "itemRow";
+
+        let label = document.createElement("label");
+        label.innerText = item;
+
+        let input = document.createElement("input");
+        input.type = "number";
+        input.step = "any";
+        input.value = rarityMapping[item];
+        input.className = "rarityInput";
+        input.dataset.item = item;
+
+        row.appendChild(label);
+        row.appendChild(input);
+        list.appendChild(row);
+      });
+    }
+
+    function saveRarities() {
+      document.querySelectorAll(".rarityInput").forEach(input => {
+        let item = input.dataset.item;
+        rarityMapping[item] = parseFloat(input.value);
+      });
+      alert("Rarity values saved!");
+      console.log("Updated rarity mapping:", rarityMapping);
+    }
+
+    /*******************************************************
+     * 5) EVENT LISTENERS
+     *******************************************************/
+    document.getElementById("generateCardButton").addEventListener("click", main);
+    document.getElementById("editRaritiesButton").addEventListener("click", () => {
+      toggleRarityEditor();
+      buildRarityEditor();
+    });
+    document.getElementById("saveRaritiesButton").addEventListener("click", saveRarities);
+
+    document.getElementById("sizeRandomYes").addEventListener("change", () => {
+      document.getElementById("manualSizeSelect").style.display = "none";
+    });
+    document.getElementById("sizeRandomNo").addEventListener("change", () => {
+      document.getElementById("manualSizeSelect").style.display = "inline-block";
+    });
+  </script>
+</body>
+</html>
