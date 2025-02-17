@@ -40,7 +40,7 @@
     #bingoCard table {
       margin: 20px auto;
       border-collapse: collapse;
-      table-layout: fixed; /* fixed layout prevents jitter */
+      table-layout: fixed; /* Prevents jitter */
       width: auto;
     }
     #bingoCard td {
@@ -149,24 +149,23 @@
   <div id="rarityEditor">
     <h2>Edit Item Rarities</h2>
     <p>
-      The rarity categories are defined as follows:
+      Rarity categories and their numeric values:
       <ul style="list-style-type: none; padding-left: 0;">
-        <li><strong>Super Rare</strong> → 0.000001</li>
-        <li><strong>Rare</strong> → 0.01</li>
-        <li><strong>Uncommon</strong> → 0.5</li>
-        <li><strong>Common</strong> → 1</li>
-        <li><strong>Very Common</strong> → 2</li>
+        <li><strong>Very Common</strong> → 2 (50% chance)</li>
+        <li><strong>Common</strong> → 1 (30% chance)</li>
+        <li><strong>Uncommon</strong> → 0.5 (14.9% chance)</li>
+        <li><strong>Rare</strong> → 0.01 (5% chance)</li>
+        <li><strong>Super Rare</strong> → 0.001 (0.1% chance)</li>
       </ul>
-      Adjust the dropdown for each item to change its rarity. Then click "Save Changes."
+      Adjust the dropdown for each item to change its default rarity.
     </p>
     <div id="rarityList"></div>
     <button id="saveRaritiesButton">Save Changes</button>
   </div>
   
-  <!-- Audio Elements for Animations and Rarity Sound Cues -->
+  <!-- Audio Elements (Replace URLs with working sound files if needed) -->
   <audio id="spinSound" src="https://cdn.pixabay.com/download/audio/2022/08/20/audio_f5a8404616.mp3?filename=casino-slot-machine-112138.mp3"></audio>
   <audio id="revealSound" src="https://cdn.pixabay.com/download/audio/2021/08/04/audio_12a42400c4.mp3?filename=retro-game-notification-38284.mp3"></audio>
-  <!-- Replace these URLs with working sound file URLs if needed -->
   <audio id="soundSuperRare" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_d1125d6e29.mp3"></audio>
   <audio id="soundRare" src="https://cdn.pixabay.com/download/audio/2021/11/18/audio_033a7f6d7b.mp3"></audio>
   <audio id="soundUncommon" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_95f7154e04.mp3"></audio>
@@ -175,7 +174,7 @@
   
   <!-- Full Item List Script -->
   <script>
-    // Full list exactly as provided (line-break separated)
+    // Paste the full item list exactly as provided (line-break separated)
     const fullItemsString = `STONE
 GRANITE
 POLISHED_GRANITE
@@ -257,7 +256,7 @@ WAXED_OXIDIZED_COPPER
 WAXED_CUT_COPPER
 WAXED_EXPOSED_CUT_COPPER
 WAXED_WEATHERED_CUT_COPPER
-WAXED_OXIDIZED_COPPER
+WAXED_OXIDIZED_CUT_COPPER
 WAXED_CUT_COPPER_STAIRS
 WAXED_EXPOSED_CUT_COPPER_STAIRS
 WAXED_WEATHERED_CUT_COPPER_STAIRS
@@ -1082,17 +1081,19 @@ ELYTRA
 REDSTONE_LAMP
 LIGHTNING_ROD`;
       
-    let fullItemsArray = fullItemsString.split("\n").map(s => s.trim()).filter(s => s !== "");
+    let fullItemsArray = fullItemsString.split("\n").map(s => s.trim()).filter(s => s !== "" && s !== "SUSPICIOUS_SAND" && s !== "SUSPICIOUS_GRAVEL" && s !== "PETRIFIED_OAK_SLAB");
       
     /***********************************************************
      * 2) RARITY SYSTEM – CATEGORIES & DEFAULT VALUES
      ***********************************************************/
+    // New category mapping based on your odds:
+    // Very Common: value = 2, Common: 1, Uncommon: 0.5, Rare: 0.01, Super Rare: 0.001
     const categoryMapping = {
-      "Super Rare": { value: 0.000001, color: "#8A2BE2", textColor: "#FFFFFF", score: 5 },
-      "Rare":       { value: 0.01,     color: "#1E90FF", textColor: "#FFFFFF", score: 3 },
-      "Uncommon":   { value: 0.5,      color: "#32CD32", textColor: "#FFFFFF", score: 2 },
-      "Common":     { value: 1,        color: "#FFFFFF", textColor: "#000000", score: 1 },
-      "Very Common":{ value: 2,        color: "#FFD700", textColor: "#000000", score: 0.5 }
+      "Very Common": { value: 2, color: "#FFD700", textColor: "#000000", score: 0.5 },
+      "Common": { value: 1, color: "#FFFFFF", textColor: "#000000", score: 1 },
+      "Uncommon": { value: 0.5, color: "#32CD32", textColor: "#FFFFFF", score: 2 },
+      "Rare": { value: 0.01, color: "#1E90FF", textColor: "#FFFFFF", score: 3 },
+      "Super Rare": { value: 0.001, color: "#8A2BE2", textColor: "#FFFFFF", score: 5 }
     };
       
     function getValueFromCategory(cat) { return categoryMapping[cat] ? categoryMapping[cat].value : 1; }
@@ -1108,281 +1109,46 @@ LIGHTNING_ROD`;
       return bestCat;
     }
       
-    // Default rarity assignment for each item.
+    // Reassign each item based on its difficulty (these assignments are based on how long and complex it is to obtain the item in survival):
     function getItemRarity(item) {
       const name = item.toUpperCase();
+      // Extremely abundant building blocks – VERY COMMON (2)
+      if (["STONE", "DIRT", "COBBLESTONE", "COARSE_DIRT", "PODZOL", "ROOTED_DIRT", "MUD", "OAK_PLANKS", "SPRUCE_PLANKS", "BIRCH_PLANKS"].includes(name)) return 2;
+      if (["GRANITE", "POLISHED_GRANITE", "DIORITE", "POLISHED_DIORITE", "ANDESITE", "POLISHED_ANDESITE", "DEEPSLATE", "COBBLED_DEEPSLATE", "POLISHED_DEEPSLATE", "CALCITE", "BAMBOO_BLOCK"].includes(name)) return 2;
+      // Grass block requires silk touch → RARE (0.01)
       if (name === "GRASS_BLOCK") return 0.01;
-      if (name === "MANGROVE_PROPAGULE") return 0.0001;
-      if (name === "CHORUS_FRUIT") return 0.000001;
+      // Saplings are abundant → VERY COMMON
+      if (name.endsWith("_SAPLING")) return 2;
+      // Logs and wood are abundant → VERY COMMON
+      if (name.endsWith("_LOG") || name.endsWith("_WOOD") || name.endsWith("_PLANKS")) return 2;
+      // Leaves are abundant → VERY COMMON
+      if (name.endsWith("_LEAVES")) return 2;
+      // Ores require mining with Silk Touch → RARE (0.01)
       if (name.endsWith("_ORE")) return 0.01;
-      if (name.endsWith("_BLOCK") && /COAL|IRON|COPPER|GOLD|DIAMOND|EMERALD|LAPIS|AMETHYST/.test(name)) return 0.5;
-      if (name.includes("INGOT") && /IRON|COPPER|GOLD/.test(name)) return 0.5;
-      if ((name.includes("IRON") || name.includes("GOLD") || name.includes("COPPER")) &&
-          /SWORD|PICKAXE|AXE|SHOVEL|HOE|HELMET|CHESTPLATE|LEGGINGS|BOOTS/.test(name))
-          return 0.5;
-      if (["CUT_COPPER","CUT_COPPER_STAIRS","CUT_COPPER_SLAB","COPPER_GRATE"].includes(name)) return 0.4;
-      if (name.includes("COPPER") && (name.includes("WAXED") || name.includes("EXPOSED") || name.includes("WEATHERED") || name.includes("OXIDIZED")))
-          return 0.000001;
-      if (/_LOG$/.test(name) || /_WOOD$/.test(name) || /_PLANKS$/.test(name) ||
-          /_SAPLING$/.test(name) || /_LEAVES$/.test(name))
-          return 1;
-      if (["STONE","COBBLESTONE","DIRT","COARSE_DIRT","PODZOL","ROOTED_DIRT","MUD"].includes(name))
-          return 1;
-      if (name.endsWith("_SLAB") || name.endsWith("_STAIRS") || name.endsWith("_WALL")) {
-          if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.2;
-          return 1;
-      }
-      if (name === "SPONGE" || name === "WET_SPONGE") return 0.01;
-      if (name.includes("PITCHER_PLANT") || name.includes("TORCHFLOWER") ||
-          name.includes("PITCHER_SEED") || name.includes("TORCHFLOWER_SEED"))
-          return 0.01;
-      if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.2;
-      if (name === "CONDUIT") return 0.001;
-      if (["END_STONE","END_STONE_BRICKS","PURPUR_BLOCK","PURPUR_PILLAR"].includes(name))
-          return 0.0001;
-      if (name.includes("NETHERITE")) return 0.001;
-      if (name.includes("BLAZE") || name === "ENDER_PEARL") return 0.001;
-      if (name.includes("ANCIENT_DEBRIS")) return 0.005;
-      if (name.includes("BASALT") || name.includes("BLACKSTONE") ||
-          name.includes("NETHERRACK") || name.includes("GLOWSTONE"))
-          return 0.02;
-      if (name.includes("SADDLE") || name.includes("NAME_TAG") ||
-          name.includes("ENCHANTING_TABLE") || name.includes("ANVIL"))
-          return 0.01;
-      if (name.includes("GOLDEN_APPLE") || name.includes("POTION") ||
-          name.includes("BREWING_STAND"))
-          return 0.01;
-      return 1;
-    }
-      
-    let rarityMapping = {};
-    fullItemsArray.forEach(item => { rarityMapping[item] = getItemRarity(item); });
+      // Ore blocks (and raw metal blocks) are crafted → COMMON (1)
+      if (name.endsWith("_BLOCK") && /COAL|IRON|COPPER|GOLD|DIAMOND|EMERALD|LAPIS|AMETHYST/.test(name)) return 1;
+      // Ingots → COMMON (1)
+      if (name.includes("INGOT") && /IRON|COPPER|GOLD/.test(name)) return 1;
+      // Tools/armor made of stone → VERY COMMON (2) since they're basic\n      if ((name.includes("SWORD") || name.includes("SHOVEL") || name.includes("PICKAXE") || name.includes("AXE") || name.includes("HOE")) && name.includes("STONE")) return 2;
+      // Tools/armor made of metal (iron, copper, gold) → COMMON (1)\n      if ((name.includes("SWORD") || name.includes("SHOVEL") || name.includes("PICKAXE") || name.includes("AXE") || name.includes("HOE") || name.includes("HELMET") || name.includes("CHESTPLATE") || name.includes("LEGGINGS") || name.includes("BOOTS")) && (name.includes("IRON") || name.includes("GOLD") || name.includes("COPPER"))) return 1;
+      // Variants like CUT_COPPER that don’t require extra processing → COMMON (1)
+      if (["CUT_COPPER","CUT_COPPER_STAIRS","CUT_COPPER_SLAB","COPPER_GRATE"].includes(name)) return 1;
+      // Waxed/Exposed/Weathered/Oxidized copper variants require extra processing → SUPER RARE (0.001)
+      if (name.includes("COPPER") && (name.includes("WAXED") || name.includes("EXPOSED") || name.includes("WEATHERED") || name.includes("OXIDIZED"))) return 0.001;
+      // Slabs, stairs, walls – most are crafted and common → COMMON (1) (exceptions below)\n      if (name.endsWith("_SLAB") || name.endsWith("_STAIRS") || name.endsWith("_WALL")) {\n         if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.5; // Uncommon\n         return 1;\n      }\n      // Sponge – only obtainable from Ocean Monuments → RARE (0.01)\n      if (name === "SPONGE" || name === "WET_SPONGE") return 0.01;\n      // Special plants (pitcher, torchflower, etc.) require extra work → RARE (0.01)\n      if (name.includes("PITCHER_PLANT") || name.includes("TORCHFLOWER") || name.includes("PITCHER_SEED") || name.includes("TORCHFLOWER_SEED")) return 0.01;\n      // Prismarine and sea lantern variants → UNCOMMON (0.5)\n      if (name.includes("PRISMARINE") || name.includes("SEA_LANTERN")) return 0.5;\n      // Conduit – extremely rare to obtain → SUPER RARE (0.001)\n      if (name === "CONDUIT") return 0.001;\n      // End-related blocks: End Stone and End Stone Bricks → SUPER RARE (0.001)\n      if (["END_STONE", "END_STONE_BRICKS"].includes(name)) return 0.001;\n      // Chorus fruit is already forced to be SUPER RARE → (0.001)\n      if (name === "CHORUS_FRUIT") return 0.001;\n      // Purpur blocks/pillars – crafted from chorus fruit → SUPER RARE (0.001)\n      if (["PURPUR_BLOCK", "PURPUR_PILLAR"].includes(name)) return 0.001;\n      // Dragon items (head, egg, elytra) → SUPER RARE (0.001)\n      if (name === "DRAGON_HEAD" || name === "DRAGON_EGG" || name === "ELYTRA") return 0.001;\n      // Redstone lamp → RARE (0.05)\n      if (name === "REDSTONE_LAMP") return 0.05;\n      // Lightning rod → RARE (0.05)\n      if (name === "LIGHTNING_ROD") return 0.05;\n      // Nether items (netherite, blaze, ancient debris, etc.) → generally RARE (0.05)\n      if (name.includes("NETHERITE")) return 0.05;\n      if (name.includes("BLAZE") || name === "ENDER_PEARL") return 0.05;\n      if (name.includes("ANCIENT_DEBRIS")) return 0.05;\n      // Basalt, Blackstone, Netherrack, Glowstone → UNCOMMON (0.5) [medium difficulty]\n      if (name.includes("BASALT") || name.includes("BLACKSTONE") || name.includes("NETHERRACK") || name.includes("GLOWSTONE")) return 0.5;\n      // Items like Saddle, Name Tag, Enchanting Table, Anvil → RARE (0.05)\n      if (name.includes("SADDLE") || name.includes("NAME_TAG") || name.includes("ENCHANTING_TABLE") || name.includes("ANVIL")) return 0.05;\n      // Golden apple, Potion, Brewing Stand → RARE (0.05)\n      if (name.includes("GOLDEN_APPLE") || name.includes("POTION") || name.includes("BREWING_STAND")) return 0.05;\n      // For any other item, default to COMMON (1)\n      return 1;\n    }\n      
+    let rarityMapping = {};\n    fullItemsArray.forEach(item => { rarityMapping[item] = getItemRarity(item); });
       
     /***********************************************************
      * 3) CARD GENERATION – Rarity Roll then Random Item
      ***********************************************************/
-    const fixedCategoryProbabilities = {
-      "Super Rare": 0.05,
-      "Rare": 0.15,
-      "Uncommon": 0.30,
-      "Common": 0.40,
-      "Very Common": 0.10
-    };
-      
-    function generateCardArray(size) {
-      let pool = fullItemsArray.slice();
-      let card = [];
-      let overallScore = 0;
-      for (let i = 0; i < size; i++) {
-        card[i] = [];
-        for (let j = 0; j < size; j++) {
-          let roll = Math.random();
-          let cumulative = 0, chosenCat = "Common";
-          for (let cat in fixedCategoryProbabilities) {
-            cumulative += fixedCategoryProbabilities[cat];
-            if (roll < cumulative) { chosenCat = cat; break; }
-          }
-          let available = pool.filter(item => getCategoryFromValue(rarityMapping[item]) === chosenCat);
-          let chosenItem;
-          if (available.length > 0) {
-            chosenItem = available[Math.floor(Math.random() * available.length)];
-          } else {
-            chosenItem = pool[Math.floor(Math.random() * pool.length)];
-            chosenCat = getCategoryFromValue(rarityMapping[chosenItem]);
-          }
-          pool.splice(pool.indexOf(chosenItem), 1);
-          card[i][j] = { item: chosenItem, category: chosenCat };
-          overallScore += categoryMapping[chosenCat].score;
-        }
-      }
-      card[0][0]._overallScore = overallScore;
-      return card;
-    }
-      
-    function computeCardGrade(card, size) {
-      const maxScore = 5 * size * size;
-      const ratio = card[0][0]._overallScore / maxScore;
-      if (ratio >= 0.8) return "Legendary Card";
-      if (ratio >= 0.6) return "Epic Card";
-      if (ratio >= 0.4) return "Rare Card";
-      if (ratio >= 0.2) return "Common Card";
-      return "Very Common Card";
-    }
-      
-    function buildCardTable(card) {
-      let size = card.length;
-      let table = document.createElement("table");
-      table.style.tableLayout = "fixed";
-      for (let i = 0; i < size; i++) {
-        let tr = document.createElement("tr");
-        for (let j = 0; j < size; j++) {
-          let td = document.createElement("td");
-          td.innerText = "";
-          tr.appendChild(td);
-        }
-        table.appendChild(tr);
-      }
-      document.getElementById("bingoCard").innerHTML = "";
-      document.getElementById("bingoCard").appendChild(table);
-      return table;
-    }
-      
-    async function revealCardSequentially(card, table) {
-      let size = card.length;
-      let cells = table.getElementsByTagName("td");
-      let cellDelay = 500;
-      for (let i = 0; i < size; i++) {
-        for (let j = 0; j < size; j++) {
-          let cell = cells[i * size + j];
-          await revealCell(cell, card[i][j].item, card[i][j].category, cellDelay);
-        }
-      }
-    }
-      
-    function revealCell(cellElem, finalItem, rarityCategory, revealTime) {
-      return new Promise(resolve => {
-        let startTime = Date.now();
-        let interval = setInterval(() => {
-          if (Date.now() - startTime >= revealTime) {
-            clearInterval(interval);
-            cellElem.innerHTML = finalItem + "<br><span style='font-size:10px;'>" + rarityCategory + "</span>";
-            cellElem.style.backgroundColor = getColorForCategory(rarityCategory);
-            cellElem.style.color = getTextColorForCategory(rarityCategory);
-            if (rarityCategory === "Super Rare") {
-              document.getElementById("soundSuperRare").currentTime = 0;
-              document.getElementById("soundSuperRare").play();
-            } else if (rarityCategory === "Rare") {
-              document.getElementById("soundRare").currentTime = 0;
-              document.getElementById("soundRare").play();
-            } else if (rarityCategory === "Uncommon") {
-              document.getElementById("soundUncommon").currentTime = 0;
-              document.getElementById("soundUncommon").play();
-            } else if (rarityCategory === "Common") {
-              document.getElementById("soundCommon").currentTime = 0;
-              document.getElementById("soundCommon").play();
-            } else if (rarityCategory === "Very Common") {
-              document.getElementById("soundVeryCommon").currentTime = 0;
-              document.getElementById("soundVeryCommon").play();
-            }
-            resolve();
-          } else {
-            cellElem.innerText = fullItemsArray[Math.floor(Math.random() * fullItemsArray.length)];
-          }
-        }, 50);
-      });
-    }
-      
-    async function animateSlotMachine(finalSize) {
-      return new Promise(resolve => {
-        let slotMachine = document.getElementById("slotMachine");
-        slotMachine.style.display = "block";
-        let reel1 = document.getElementById("reel1");
-        let reel2 = document.getElementById("reel2");
-        let reel3 = document.getElementById("reel3");
-        let sizes = [1,2,3,4,5,6,7,8,9,10];
-        let interval = setInterval(() => {
-          reel1.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
-          reel2.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
-          reel3.innerText = sizes[Math.floor(Math.random()*sizes.length)] + "×" + sizes[Math.floor(Math.random()*sizes.length)];
-        }, 100);
-        setTimeout(() => {
-          clearInterval(interval);
-          let display = finalSize + "×" + finalSize;
-          reel1.innerText = display;
-          reel2.innerText = display;
-          reel3.innerText = display;
-          document.getElementById("spinSound").currentTime = 0;
-          document.getElementById("spinSound").play();
-          setTimeout(() => {
-            slotMachine.style.display = "none";
-            resolve(finalSize);
-          }, 500);
-        }, 2000);
-      });
-    }
-      
-    async function getCardSize() {
-      if (document.getElementById("sizeRandomYes").checked) {
-        let randomSize = Math.floor(Math.random() * 3) + 3;
-        let finalSize = await animateSlotMachine(randomSize);
-        return finalSize;
-      } else {
-        return parseInt(document.getElementById("manualSizeSelect").value);
-      }
-    }
-      
-    async function main() {
-      document.getElementById("generateCardButton").disabled = true;
-      document.getElementById("gradeDisplay").innerText = "";
-      document.getElementById("cardSizeDisplay").innerText = "";
-      document.getElementById("bingoCard").innerHTML = "";
-      let size = await getCardSize();
-      document.getElementById("cardSizeDisplay").innerText = `Card Size: ${size}×${size}`;
-      let card = generateCardArray(size);
-      let table = buildCardTable(card);
-      await revealCardSequentially(card, table);
-      let grade = computeCardGrade(card, size);
-      document.getElementById("gradeDisplay").innerText = `Card Rarity Grade: ${grade}`;
-      document.getElementById("generateCardButton").disabled = false;
-    }
-      
-    /***********************************************************
-     * 4) RARITY EDITOR – DROPDOWNS & INFO PANEL
-     ***********************************************************/
-    function toggleRarityEditor() {
-      let panel = document.getElementById("rarityEditor");
-      panel.style.display = (panel.style.display === "none" || panel.style.display === "") ? "block" : "none";
-    }
-    function buildRarityEditor() {
-      let list = document.getElementById("rarityList");
-      list.innerHTML = "";
-      fullItemsArray.forEach(item => {
-        let row = document.createElement("div");
-        row.className = "itemRow";
-        let label = document.createElement("label");
-        label.innerText = item;
-        let currentVal = rarityMapping[item];
-        let currentCat = getCategoryFromValue(currentVal);
-        let dropdown = document.createElement("select");
-        dropdown.className = "rarityDropdown";
-        dropdown.dataset.item = item;
-        for (let catName in categoryMapping) {
-          let opt = document.createElement("option");
-          opt.value = catName;
-          opt.textContent = catName;
-          if (catName === currentCat) { opt.selected = true; }
-          dropdown.appendChild(opt);
-        }
-        row.appendChild(label);
-        row.appendChild(dropdown);
-        list.appendChild(row);
-      });
-    }
-    function saveRarities() {
-      document.querySelectorAll(".rarityDropdown").forEach(dropdown => {
-        let item = dropdown.dataset.item;
-        let chosenCat = dropdown.value;
-        rarityMapping[item] = getValueFromCategory(chosenCat);
-      });
-      alert("Rarity values saved!");
-      console.log("Updated rarity mapping:", rarityMapping);
-    }
-      
-    /***********************************************************
-     * 5) EVENT LISTENERS
-     ***********************************************************/
-    document.getElementById("generateCardButton").addEventListener("click", main);
-    document.getElementById("editRaritiesButton").addEventListener("click", () => {
-      toggleRarityEditor();
-      buildRarityEditor();
-    });
-    document.getElementById("saveRaritiesButton").addEventListener("click", saveRarities);
-    document.getElementById("sizeRandomYes").addEventListener("change", () => {
-      document.getElementById("manualSizeSelect").style.display = "none";
-    });
-    document.getElementById("sizeRandomNo").addEventListener("change", () => {
-      document.getElementById("manualSizeSelect").style.display = "inline-block";
-    });
-  </script>
-</body>
-</html>
+    const fixedCategoryProbabilities = {\n      \"Very Common\": 0.50,\n      \"Common\": 0.30,\n      \"Uncommon\": 0.149,\n      \"Rare\": 0.05,\n      \"Super Rare\": 0.001\n    };\n      
+    function generateCardArray(size) {\n      let pool = fullItemsArray.slice();\n      let card = [];\n      let overallScore = 0;\n      for (let i = 0; i < size; i++) {\n        card[i] = [];\n        for (let j = 0; j < size; j++) {\n          let roll = Math.random();\n          let cumulative = 0, chosenCat = \"Common\";\n          for (let cat in fixedCategoryProbabilities) {\n            cumulative += fixedCategoryProbabilities[cat];\n            if (roll < cumulative) { chosenCat = cat; break; }\n          }\n          let available = pool.filter(item => getCategoryFromValue(rarityMapping[item]) === chosenCat);\n          let chosenItem;\n          if (available.length > 0) {\n            chosenItem = available[Math.floor(Math.random() * available.length)];\n          } else {\n            chosenItem = pool[Math.floor(Math.random() * pool.length)];\n            chosenCat = getCategoryFromValue(rarityMapping[chosenItem]);\n          }\n          pool.splice(pool.indexOf(chosenItem), 1);\n          card[i][j] = { item: chosenItem, category: chosenCat };\n          overallScore += categoryMapping[chosenCat].score;\n        }\n      }\n      card[0][0]._overallScore = overallScore;\n      return card;\n    }\n      
+    function computeCardGrade(card, size) {\n      const maxScore = 5 * size * size;\n      const ratio = card[0][0]._overallScore / maxScore;\n      if (ratio >= 0.8) return \"Legendary Card\";\n      if (ratio >= 0.6) return \"Epic Card\";\n      if (ratio >= 0.4) return \"Rare Card\";\n      if (ratio >= 0.2) return \"Common Card\";\n      return \"Very Common Card\";\n    }\n      
+    function buildCardTable(card) {\n      let size = card.length;\n      let table = document.createElement(\"table\");\n      table.style.tableLayout = \"fixed\";\n      for (let i = 0; i < size; i++) {\n        let tr = document.createElement(\"tr\");\n        for (let j = 0; j < size; j++) {\n          let td = document.createElement(\"td\");\n          td.innerText = \"\";\n          tr.appendChild(td);\n        }\n        table.appendChild(tr);\n      }\n      document.getElementById(\"bingoCard\").innerHTML = \"\";\n      document.getElementById(\"bingoCard\").appendChild(table);\n      return table;\n    }\n      
+    async function revealCardSequentially(card, table) {\n      let size = card.length;\n      let cells = table.getElementsByTagName(\"td\");\n      let cellDelay = 500;\n      for (let i = 0; i < size; i++) {\n        for (let j = 0; j < size; j++) {\n          let cell = cells[i * size + j];\n          await revealCell(cell, card[i][j].item, card[i][j].category, cellDelay);\n        }\n      }\n    }\n      
+    function revealCell(cellElem, finalItem, rarityCategory, revealTime) {\n      return new Promise(resolve => {\n        let startTime = Date.now();\n        let interval = setInterval(() => {\n          if (Date.now() - startTime >= revealTime) {\n            clearInterval(interval);\n            cellElem.innerHTML = finalItem + \"<br><span style='font-size:10px;'>\" + rarityCategory + \"</span>\";\n            cellElem.style.backgroundColor = getColorForCategory(rarityCategory);\n            cellElem.style.color = getTextColorForCategory(rarityCategory);\n            if (rarityCategory === \"Super Rare\") {\n              document.getElementById(\"soundSuperRare\").currentTime = 0;\n              document.getElementById(\"soundSuperRare\").play();\n            } else if (rarityCategory === \"Rare\") {\n              document.getElementById(\"soundRare\").currentTime = 0;\n              document.getElementById(\"soundRare\").play();\n            } else if (rarityCategory === \"Uncommon\") {\n              document.getElementById(\"soundUncommon\").currentTime = 0;\n              document.getElementById(\"soundUncommon\").play();\n            } else if (rarityCategory === \"Common\") {\n              document.getElementById(\"soundCommon\").currentTime = 0;\n              document.getElementById(\"soundCommon\").play();\n            } else if (rarityCategory === \"Very Common\") {\n              document.getElementById(\"soundVeryCommon\").currentTime = 0;\n              document.getElementById(\"soundVeryCommon\").play();\n            }\n            resolve();\n          } else {\n            cellElem.innerText = fullItemsArray[Math.floor(Math.random() * fullItemsArray.length)];\n          }\n        }, 50);\n      });\n    }\n      
+    async function animateSlotMachine(finalSize) {\n      return new Promise(resolve => {\n        let slotMachine = document.getElementById(\"slotMachine\");\n        slotMachine.style.display = \"block\";\n        let reel1 = document.getElementById(\"reel1\");\n        let reel2 = document.getElementById(\"reel2\");\n        let reel3 = document.getElementById(\"reel3\");\n        let sizes = [1,2,3,4,5,6,7,8,9,10];\n        let interval = setInterval(() => {\n          reel1.innerText = sizes[Math.floor(Math.random()*sizes.length)] + \"×\" + sizes[Math.floor(Math.random()*sizes.length)];\n          reel2.innerText = sizes[Math.floor(Math.random()*sizes.length)] + \"×\" + sizes[Math.floor(Math.random()*sizes.length)];\n          reel3.innerText = sizes[Math.floor(Math.random()*sizes.length)] + \"×\" + sizes[Math.floor(Math.random()*sizes.length)];\n        }, 100);\n        setTimeout(() => {\n          clearInterval(interval);\n          let display = finalSize + \"×\" + finalSize;\n          reel1.innerText = display;\n          reel2.innerText = display;\n          reel3.innerText = display;\n          document.getElementById(\"spinSound\").currentTime = 0;\n          document.getElementById(\"spinSound\").play();\n          setTimeout(() => {\n            slotMachine.style.display = \"none\";\n            resolve(finalSize);\n          }, 500);\n        }, 2000);\n      });\n    }\n      
+    async function getCardSize() {\n      if (document.getElementById(\"sizeRandomYes\").checked) {\n        let randomSize = Math.floor(Math.random() * 3) + 3;\n        let finalSize = await animateSlotMachine(randomSize);\n        return finalSize;\n      } else {\n        return parseInt(document.getElementById(\"manualSizeSelect\").value);\n      }\n    }\n      
+    async function main() {\n      document.getElementById(\"generateCardButton\").disabled = true;\n      document.getElementById(\"gradeDisplay\").innerText = \"\";\n      document.getElementById(\"cardSizeDisplay\").innerText = \"\";\n      document.getElementById(\"bingoCard\").innerHTML = \"\";\n      let size = await getCardSize();\n      document.getElementById(\"cardSizeDisplay\").innerText = `Card Size: ${size}×${size}`;\n      let card = generateCardArray(size);\n      let table = buildCardTable(card);\n      await revealCardSequentially(card, table);\n      let grade = computeCardGrade(card, size);\n      document.getElementById(\"gradeDisplay\").innerText = `Card Rarity Grade: ${grade}`;\n      document.getElementById(\"generateCardButton\").disabled = false;\n    }\n      
+    /***********************************************************\n     * 4) RARITY EDITOR – DROPDOWNS & INFO PANEL\n     ***********************************************************/\n    function toggleRarityEditor() {\n      let panel = document.getElementById(\"rarityEditor\");\n      panel.style.display = (panel.style.display === \"none\" || panel.style.display === \"\") ? \"block\" : \"none\";\n    }\n    function buildRarityEditor() {\n      let list = document.getElementById(\"rarityList\");\n      list.innerHTML = \"\";\n      fullItemsArray.forEach(item => {\n        let row = document.createElement(\"div\");\n        row.className = \"itemRow\";\n        let label = document.createElement(\"label\");\n        label.innerText = item;\n        let currentVal = rarityMapping[item];\n        let currentCat = getCategoryFromValue(currentVal);\n        let dropdown = document.createElement(\"select\");\n        dropdown.className = \"rarityDropdown\";\n        dropdown.dataset.item = item;\n        for (let catName in categoryMapping) {\n          let opt = document.createElement(\"option\");\n          opt.value = catName;\n          opt.textContent = catName;\n          if (catName === currentCat) { opt.selected = true; }\n          dropdown.appendChild(opt);\n        }\n        row.appendChild(label);\n        row.appendChild(dropdown);\n        list.appendChild(row);\n      });\n    }\n    function saveRarities() {\n      document.querySelectorAll(\".rarityDropdown\").forEach(dropdown => {\n        let item = dropdown.dataset.item;\n        let chosenCat = dropdown.value;\n        rarityMapping[item] = getValueFromCategory(chosenCat);\n      });\n      alert(\"Rarity values saved!\");\n      console.log(\"Updated rarity mapping:\", rarityMapping);\n    }\n      
+    /***********************************************************\n     * 5) EVENT LISTENERS\n     ***********************************************************/\n    document.getElementById(\"generateCardButton\").addEventListener(\"click\", main);\n    document.getElementById(\"editRaritiesButton\").addEventListener(\"click\", () => {\n      toggleRarityEditor();\n      buildRarityEditor();\n    });\n    document.getElementById(\"saveRaritiesButton\").addEventListener(\"click\", saveRarities);\n    document.getElementById(\"sizeRandomYes\").addEventListener(\"change\", () => {\n      document.getElementById(\"manualSizeSelect\").style.display = \"none\";\n    });\n    document.getElementById(\"sizeRandomNo\").addEventListener(\"change\", () => {\n      document.getElementById(\"manualSizeSelect\").style.display = \"inline-block\";\n    });\n  </script>\n</body>\n</html>
