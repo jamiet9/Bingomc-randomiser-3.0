@@ -2361,16 +2361,40 @@ LIGHTNING_ROD`;
         });
       }
       
-      async function getCardSize() {
-        const randomize = document.getElementById("randomCardSizeCheckbox").checked;
-        if (randomize) {
-          let randomSize = Math.floor(Math.random() * 3) + 3; // size between 3 and 5
-          let finalSize = await animateSlotMachine(randomSize);
-          return finalSize;
-        } else {
-          return parseInt(document.getElementById("manualSizeSelect").value);
-        }
+     async function getCardSize() {
+  if (document.getElementById("randomCardSizeCheckbox").checked) {
+    // Define weighted sizes for 1×1 to 10×10.
+    const weightedSizes = [
+      { size: 1, weight: 1 },
+      { size: 2, weight: 2 },
+      { size: 3, weight: 4 },
+      { size: 4, weight: 8 },
+      { size: 5, weight: 20 },
+      { size: 6, weight: 8 },
+      { size: 7, weight: 4 },
+      { size: 8, weight: 2 },
+      { size: 9, weight: 1 },
+      { size: 10, weight: 0.5 }
+    ];
+    // Calculate total weight.
+    const totalWeight = weightedSizes.reduce((sum, s) => sum + s.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenSize;
+    for (let i = 0; i < weightedSizes.length; i++) {
+      roll -= weightedSizes[i].weight;
+      if (roll < 0) {
+        chosenSize = weightedSizes[i].size;
+        break;
       }
+    }
+    // Optionally, animate the chosen size using your slot machine:
+    let finalSize = await animateSlotMachine(chosenSize);
+    return finalSize;
+  } else {
+    return parseInt(document.getElementById("manualSizeSelect").value);
+  }
+}
+
       
       /********** MAIN GENERATION FUNCTION **********/
       async function main() {
